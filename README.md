@@ -29,3 +29,5 @@ A Python RS-232 sample that uses the [PySerial library](http://pyserial.sourcefo
 ## Questions
 Please [let us know](https://github.com/PyramidTechnologies/Python-RS-232/issues/new).
 
+
+![](https://googledrive.com/host/0B79TkjL8Nm20QjU0UGhObnBTUE0/logo_2.jpg)
