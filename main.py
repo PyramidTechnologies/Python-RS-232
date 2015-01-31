@@ -61,9 +61,7 @@
 
 '''
 
-from subprocess import Popen, PIPE
-import sys, thread, time, shlex, math, re
-import serial, time, binascii, thread
+import serial, time, binascii, sys
 
 ### Globals ###
 #Change this value to modify polling rate. Currently 100 ms
@@ -72,7 +70,7 @@ PollRate = 0.1
 ### Main  Routine ###   
 def main(portname):
 
-    print "Opening Port"
+    print "Starting Master on Port {:s}".format(portname)
     
     ser = serial.Serial(
         port=portname,
@@ -95,20 +93,17 @@ def main(portname):
         msg = bytearray([0x02,  0x08,  0x10,  0x7F,  0x10,  0x00,  0x03,  0x00])
         
         msg[2] = 0x10 | ack
-        if (ack == 1):
-            ack = 0
-        else:
-            ack = 1
+        ack ^= 1
             
+        # If escrow, stack the note
         if (escrowed):
             msg[4] |= 0x20
     
-        # Get the checksum
-        for b in 
+        # Set the checksum
         msg[7] = msg[1] ^ msg[2]
-        msg[7] ^= msg[3]
-        msg[7] ^= msg[4]
-        msg[7] ^= msg[5]
+        for b in xrange(3,3):
+            msg[7] ^= msg[b]
+    
     
         ser.write(msg)
         time.sleep(0.1)
@@ -138,13 +133,15 @@ def main(portname):
         if (ord(out[4]) & 2): status += " REJECTED "	 #Bill was rejected
         if (ord(out[4]) & 4): status += " JAMMED "		 #Bill is jammed in Acceptor
         if (ord(out[4]) & 8): status += " FULL "		 #Cassette is full (must be emptied)
-        if (ord(out[4]) & 0x10): status += " CASSETTE "
+        if (ord(out[4]) & 0x10) != 0x10: status += " CASSETTE MISSING"
             
         # Only update the status if it has changed
         if (lastState != status):
             print 'Acceptor status:',status
             lastState = status
-            
+
+        print ", ".join("0x{:02x}".format(ord(c)) for c in out)
+        
         # Print credit(s)  
         credit = ord(out[5]) & 0x38
         if(credit == 0): credit = 0
@@ -157,7 +154,6 @@ def main(portname):
         if(credit == 0x38): credit = 7
             
         if(credit != 0):
-            lastCredit = credit
             if(ord(out[3]) & 0x10):
                 print "Bill credited: Bill#", credit
                 billCount[credit] += 1
