@@ -26,7 +26,8 @@
 ' written permission from Pyramid Technologies, Inc.
 '
 ' 4.  This copyright notice and agreement must not be deleted from the source
-' code if any or all of PTI's source code is integrated into the user's application.
+' code if any or all of PTI's source code is integrated into the user's
+'   application.
 '
 ' 5.  Permission to use this software will be revoked if it is used in a way
 ' that is deemed damaging to PTI, or used for purposes which are illegal
@@ -36,7 +37,7 @@
 
 'Overview:
 '
-'This software provides a framework for interfacing a Linux device 
+'This software provides a framework for interfacing a Linux device
 '(e.g. Raspberry Pi) to a Pyramid Bill Acceptor configured for RS-232.
 'It is intended for users who want to get up and running quickly with
 'kiosk or other PC applications requiring a bill acceptor interface.
@@ -61,108 +62,49 @@
 
 '''
 
-import serial, time, binascii, sys
+import host
+import sys
 
-### Globals ###
-#Change this value to modify polling rate. Currently 100 ms
-PollRate = 0.1
-    
-### Main  Routine ###   
+
+### Main  Routine ###
 def main(portname):
+    """
+    Starts the Master RS-232 service
+    """
 
-    print "Starting Master on Port {:s}".format(portname)
-    
-    ser = serial.Serial(
-        port=portname,
-        baudrate=9600,
-        bytesize=serial.SEVENBITS,
-        parity=serial.PARITY_EVEN,
-        stopbits=serial.STOPBITS_ONE
-    )
-    
-    ack = 0
-    credit = 0
-    lastState = ''
-    billCount = bytearray([0,0,0,0,0,0,0,0])
-    escrowed = False
+    cmd_table = '''
 
-    while ser.isOpen():
-    
-        # basic message   0      1      2      3      4      5      6      7
-        #               start,   len,   ack, bills,escrow,resv'd,  end, checksum
-        msg = bytearray([0x02,  0x08,  0x10,  0x7F,  0x10,  0x00,  0x03,  0x00])
-        
-        msg[2] = 0x10 | ack
-        ack ^= 1
-            
-        # If escrow, stack the note
-        if (escrowed):
-            msg[4] |= 0x20
-    
-        # Set the checksum
-        msg[7] = msg[1] ^ msg[2]
-        for b in xrange(3,3):
-            msg[7] ^= msg[b]
-    
-    
-        ser.write(msg)
-        time.sleep(0.1)
-    
-        out = ''
-        while ser.inWaiting() > 0:
-            out += ser.read(1)
-        if (out == ''): continue
-        
-    
-        #The following states are true if the value is [1], otherwise [0]:
-        status = ""
-        if (ord(out[3]) & 1): status += " IDLING " 		 #Acceptor is idling (waiting)
-        if (ord(out[3]) & 2): status += " ACCEPTING "  	 #Acceptor pulling in new bill
-        if (ord(out[3]) & 4):
-            status += " ESCROWED "				         #Bill is stopped in escrow
-            escrowed = True
-        else:
-            escrowed = False
-            
-        if (ord(out[3]) & 8): status += " STACKING "	 #Valid bill feeding into cassette (or to rear for stackerless)
-        if (ord(out[3]) & 0x10): status += " STACKED "	 #Valid bill now in cassette (or cleared back of unit for stackerless)
-        if (ord(out[3]) & 0x20): status += " RETURNING " #Bill is being returned to the user
-        if (ord(out[3]) & 0x40): status += " RETURNED "	 #Bill has finished being returned to the user
-            
-        if (ord(out[4]) & 1): status += " CHEATED "	 	 #Acceptor suspects cheating
-        if (ord(out[4]) & 2): status += " REJECTED "	 #Bill was rejected
-        if (ord(out[4]) & 4): status += " JAMMED "		 #Bill is jammed in Acceptor
-        if (ord(out[4]) & 8): status += " FULL "		 #Cassette is full (must be emptied)
-        if (ord(out[4]) & 0x10) != 0x10: status += " CASSETTE MISSING"
-            
-        # Only update the status if it has changed
-        if (lastState != status):
-            print 'Acceptor status:',status
-            lastState = status
+    H or ? to show Help
+    Q or CTRL+C to Quit
 
-        print ", ".join("0x{:02x}".format(ord(c)) for c in out)
-        
-        # Print credit(s)  
-        credit = ord(out[5]) & 0x38
-        if(credit == 0): credit = 0
-        if(credit == 8): credit = 1
-        if(credit == 0x10): credit = 2
-        if(credit == 0x18): credit = 3
-        if(credit == 0x20): credit = 4
-        if(credit == 0x28): credit = 5
-        if(credit == 0x30): credit = 6
-        if(credit == 0x38): credit = 7
-            
-        if(credit != 0):
-            if(ord(out[3]) & 0x10):
-                print "Bill credited: Bill#", credit
-                billCount[credit] += 1
-                print "Acceptor now holds:",binascii.hexlify(billCount)
-                
-        time.sleep(PollRate)    
-        
-    print "port closed"
-    ser.close()        
-    
+    V - Enable Verbose mode
+    '''
+
+    print "Starting RS-232 Master on port {:s}".format(portname)
+    master = host.Host()
+    master.start(portname)
+
+
+    # Loop until we are to exit
+    try:
+        print cmd_table
+        while master.running:
+
+            cmd = raw_input()
+            result = master.parse_cmd(cmd)
+            if result is 0:
+                pass
+            elif result is 1:
+                master.stop()
+            elif result is 2:
+                print cmd_table
+
+    except KeyboardInterrupt:
+        master.running = False
+
+    print '\n\nGoodbye!'
+    print 'Port {:s} closed'.format(portname)
+
+
 if __name__ == "__main__":
     main(sys.argv[1])
