@@ -46,6 +46,7 @@ import serial, time, binascii
 #Change this value to modify polling rate. Currently 100 ms
 POLL_RATE = 0.1
 
+#pylint: disable-msg=R0902
 
 class Host(object):
     """
@@ -178,18 +179,22 @@ class Host(object):
 
             # With the exception of Stacked and Returned, only we can
             # only be in one state at once
-            status = Host.state_dict[ord(out[3])]
+            try:
+                status = Host.state_dict[ord(out[3])]
+            except KeyError:
+                print "unknown state dic key {:d}".format(ord(out[3]))
+
             self.escrowed = ord(out[3]) & 4
-            if ord(out[3]) & 0x10:
-                status += " STACKED "
-            if ord(out[3]) & 0x40:
-                status += " RETURNED "
 
             # If there is no match, we get an empty string
-            status += Host.event_dict[ord(out[4]) & 1]
-            status += Host.event_dict[ord(out[4]) & 2]
-            status += Host.event_dict[ord(out[4]) & 4]
-            status += Host.event_dict[ord(out[4]) & 8]
+            try:
+                status += Host.event_dict[ord(out[4]) & 1]
+                status += Host.event_dict[ord(out[4]) & 2]
+                status += Host.event_dict[ord(out[4]) & 4]
+                status += Host.event_dict[ord(out[4]) & 8]
+            except KeyError:
+                print "unknown state dic key {:d}".format(ord(out[4]))
+
             if ord(out[4]) & 0x10 != 0x10:
                 status += " CASSETTE MISSING"
 
@@ -208,7 +213,8 @@ class Host(object):
                 if ord(out[3]) & 0x10:
                     print "Bill credited: Bill#", credit
                     self.bill_count[credit] += 1
-                    print "Acceptor now holds:", binascii.hexlify(self.bill_count)
+                    print "Acceptor now holds: {:s}".format(
+                        binascii.hexlify(self.bill_count))
 
             time.sleep(POLL_RATE)
 
