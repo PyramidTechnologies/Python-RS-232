@@ -118,12 +118,12 @@ class Host(object):
         Returns:
             Int -- 0 if okay, 1 to exit, 2 to quit
         """
-        if cmd is 'Q':
+        if cmd == 'Q':
             return 1
-        if cmd is '?' or cmd is 'H':
+        if cmd == '?' or cmd is 'H':
             return 2
 
-        if cmd is 'V':
+        if cmd == 'V':
             self.verbose = not self.verbose
 
         return 0
@@ -150,9 +150,9 @@ class Host(object):
 
         while ser.isOpen() and self.running:
 
-            # basic message   0      1      2      3      4      5    6      7
-            #               start, len,  ack, bills,escrow,resv'd,end, checksum
-            msg = bytearray([0x02, 0x08, 0x10, 0x7F, 0x10, 0x00, 0x03, 0x00])
+            # basic message   0      1     2      3      4      5     6         7
+            #               start, len,  ack, bills,escrow,resv'd,  end, checksum
+            msg = bytearray([0x02, 0x08, 0x10, 0x7F,  0x00,  0x00, 0x03,     0x00])
 
             msg[2] = 0x10 | self.ack
             self.ack ^= 1
@@ -162,8 +162,7 @@ class Host(object):
                 msg[4] |= 0x20
 
             # Set the checksum
-            msg[7] = msg[1] ^ msg[2]
-            for byte in xrange(3, 3):
+            for byte in xrange(1, 6):
                 msg[7] ^= msg[byte]
 
 
@@ -182,6 +181,7 @@ class Host(object):
             try:
                 status = Host.state_dict[ord(out[3])]
             except KeyError:
+                status = ''
                 print "unknown state dic key {:d}".format(ord(out[3]))
 
             self.escrowed = ord(out[3]) & 4
